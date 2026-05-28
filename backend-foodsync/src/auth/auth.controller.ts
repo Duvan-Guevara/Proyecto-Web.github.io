@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import type {
   LoginDto,
+  RegisterDto,
   VerifyLoginTwoFactorDto,
   VerifyTotpCodeDto,
 } from './auth.types';
@@ -9,6 +10,11 @@ import type {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body);
+  }
 
   @Post('login')
   login(@Body() body: LoginDto) {

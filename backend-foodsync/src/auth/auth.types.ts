@@ -3,6 +3,13 @@ export interface LoginDto {
   password: string;
 }
 
+export interface RegisterDto {
+  nombre: string;
+  email: string;
+  password: string;
+  tipo: string;
+}
+
 export interface VerifyLoginTwoFactorDto {
   challengeToken: string;
   code: string;

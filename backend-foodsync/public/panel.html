@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8">
+<title>Panel Administrativo | FoodSync</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body>
+
+<header class="hero small">
+    <h1>Panel Administrativo</h1>
+</header>
+
+<div class="container">
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>Usuarios</h2>
+            <ul id="usuariosList" class="list"></ul>
+        </div>
+
+        <div class="card">
+            <h2>Donaciones</h2>
+            <ul id="donacionesList" class="list"></ul>
+        </div>
+
+        <div class="card">
+            <h2>Google Authenticator</h2>
+            <p id="twoFactorStatus" class="status-text"></p>
+            <div class="action-row">
+                <button id="startTwoFactorSetup" class="btn btn-primary" type="button">Activar 2FA</button>
+                <button id="disableTwoFactor" class="btn btn-outline-dark" type="button" hidden>Desactivar 2FA</button>
+            </div>
+
+            <div id="twoFactorSetupBox" class="two-factor-box" hidden>
+                <p class="helper-text">Escanea este QR con Google Authenticator o agrega la clave manual.</p>
+                <img id="twoFactorQr" class="qr-image" alt="QR de Google Authenticator">
+                <p class="helper-text">Clave manual:</p>
+                <code id="twoFactorSecret" class="secret-code"></code>
+                <label for="twoFactorCode">Codigo generado</label>
+                <input id="twoFactorCode" type="text" maxlength="6" placeholder="123456">
+                <button id="verifyTwoFactorSetup" class="btn btn-primary" type="button">Confirmar codigo</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="panel-actions">
+        <a href="index.html" class="btn btn-outline-dark">Volver al inicio</a>
+        <a href="#" id="logoutButton" class="btn btn-outline-dark">Cerrar sesion</a>
+    </div>
+
+</div>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>

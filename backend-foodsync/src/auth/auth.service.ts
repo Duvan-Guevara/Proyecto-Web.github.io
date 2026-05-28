@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import { PasswordService } from './password.service';
 import { TotpService } from './totp.service';
+import { RegisterDto } from './auth.types';
 import { UsersService } from '../users/users.service';
 import { SafeUser } from '../users/users.types';
 
@@ -24,6 +25,10 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly totpService: TotpService,
   ) {}
+
+  async register(data: RegisterDto) {
+    return this.usersService.create(data);
+  }
 
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
