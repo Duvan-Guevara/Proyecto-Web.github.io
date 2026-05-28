@@ -1,8 +1,23 @@
-const API_URL = "http://localhost:3000";
+const CODESPACES_API_URL = "https://cautious-garbanzo-jj6q96pwqwjfppvg-3000.app.github.dev";
+const API_URL = getApiUrl();
 const SESSION_KEY = "foodsync_session";
 
 let pendingChallengeToken = null;
 let pendingTwoFactorSetup = null;
+
+function getApiUrl() {
+  const { hostname, origin } = window.location;
+
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3000";
+  }
+
+  if (hostname.endsWith(".app.github.dev") && origin.includes("-3000.")) {
+    return origin;
+  }
+
+  return CODESPACES_API_URL;
+}
 
 function guardarSesion(session) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));

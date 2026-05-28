@@ -1,0 +1,344 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Calibri;}{\f1 Consolas;}}
+\fs24
+\b Documento de modificaciones y justificaciones del proyecto FoodSync\b0\par
+\par
+Proyecto: FoodSync\par
+Ubicacion: D:\UNIVERSIDAD USC\Cuarto Semestre\Programacion Web\Proyecto-Web.github.io-main\par
+Fecha: 2026-05-08\par
+\par
+\b 1. Objetivo general\b0\par
+Se implemento un sistema de autenticacion con usuario y contrasena conectado a MongoDB para permitir el registro de usuarios, el inicio de sesion y la proteccion basica de paginas sensibles del sistema.\par
+\par
+\b 2. Problema inicial detectado\b0\par
+Antes de la modificacion, el proyecto tenia un modulo de usuarios y un modulo de donaciones, pero no existia una capa de autenticacion real. Los principales problemas eran los siguientes:\par
+1. No existia un endpoint de login.\par
+2. Las contrasenas se almacenaban sin cifrado.\par
+3. No habia validacion de credenciales contra la base de datos.\par
+4. El frontend permitia registrar, pero no iniciar sesion ni proteger vistas.\par
+5. La informacion del usuario se podia exponer innecesariamente si se devolvia la contrasena desde la API.\par
+\par
+\b 3. Resumen de archivos agregados o modificados\b0\par
+Backend:\par
+- backend-foodsync\src\auth\auth.module.ts\par
+- backend-foodsync\src\auth\auth.controller.ts\par
+- backend-foodsync\src\auth\auth.service.ts\par
+- backend-foodsync\src\auth\auth.types.ts\par
+- backend-foodsync\src\auth\password.service.ts\par
+- backend-foodsync\src\users\users.service.ts\par
+- backend-foodsync\src\users\users.controller.ts\par
+- backend-foodsync\src\users\users.module.ts\par
+- backend-foodsync\src\users\users.schema.ts\par
+- backend-foodsync\src\users\users.types.ts\par
+- backend-foodsync\src\app.module.ts\par
+\par
+Frontend:\par
+- js\app.js\par
+- index.html\par
+- login.html\par
+\par
+\b 4. Modificaciones en el backend\b0\par
+\par
+\b 4.1. Creacion de la capa de autenticacion\b0\par
+Se creo un nuevo modulo llamado auth para centralizar la logica de autenticacion.\par
+\par
+Justificacion:\par
+- Separar la autenticacion del modulo de usuarios mejora la organizacion del proyecto.\par
+- Facilita el mantenimiento y futuras mejoras como JWT, roles o recuperacion de contrasena.\par
+- Permite seguir una arquitectura por responsabilidades: controlador, servicio y utilidades.\par
+\par
+Archivos creados:\par
+- auth.module.ts\par
+- auth.controller.ts\par
+- auth.service.ts\par
+- auth.types.ts\par
+- password.service.ts\par
+\par
+\b 4.2. Endpoint para iniciar sesion\b0\par
+Se agrego el endpoint POST /auth/login en el controlador de autenticacion.\par
+\par
+Codigo principal:\par
+{\f1\fs20
+import \{ Body, Controller, Post \} from '@nestjs/common';\line
+import \{ AuthService \} from './auth.service';\line
+import type \{ LoginDto \} from './auth.types';\line
+\line
+@Controller('auth')\line
+export class AuthController \{\line
+  constructor(private readonly authService: AuthService) \{\}\line
+\line
+  @Post('login')\line
+  login(@Body() body: LoginDto) \{\line
+    return this.authService.login(body.email, body.password);\line
+  \}\line
+\}\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Era necesario disponer de un punto de entrada para validar credenciales.\par
+- El endpoint recibe email y contrasena, consulta MongoDB y responde con el usuario autenticado y un token de sesion basico.\par
+\par
+\b 4.3. Servicio de autenticacion\b0\par
+Se creo AuthService para encapsular el proceso de login.\par
+\par
+Responsabilidades del servicio:\par
+- Buscar el usuario por correo.\par
+- Verificar la contrasena recibida.\par
+- Retornar un objeto de sesion si las credenciales son correctas.\par
+- Lanzar UnauthorizedException si las credenciales no son validas.\par
+\par
+Codigo principal:\par
+{\f1\fs20
+async login(email: string, password: string) \{\line
+  const user = await this.usersService.findByEmail(email);\line
+\line
+  if (!user) \{\line
+    throw new UnauthorizedException('Credenciales invalidas');\line
+  \}\line
+\line
+  const isValidPassword = this.passwordService.verifyPassword(\line
+    password,\line
+    user.password,\line
+  );\line
+\line
+  if (!isValidPassword) \{\line
+    throw new UnauthorizedException('Credenciales invalidas');\line
+  \}\line
+\line
+  return \{\line
+    message: 'Inicio de sesion exitoso',\line
+    token: randomUUID(),\line
+    user: this.usersService.toSafeUser(user),\line
+  \};\line
+\}\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Toda la logica sensible de autenticacion debia quedar fuera del controlador.\par
+- Esto permite reutilizar la validacion desde otros puntos si mas adelante se requiere.\par
+\par
+\b 4.4. Capa de seguridad para contrasenas\b0\par
+Se creo PasswordService usando el modulo crypto de Node.js y el algoritmo scrypt.\par
+\par
+Codigo principal:\par
+{\f1\fs20
+hashPassword(password: string): string \{\line
+  const salt = randomBytes(16).toString('hex');\line
+  const hash = scryptSync(password, salt, 64).toString('hex');\line
+  return `$\{salt\}:$\{hash\}`;\line
+\}\line
+\line
+verifyPassword(password: string, storedHash: string): boolean \{\line
+  const [salt, currentHash] = storedHash.split(':');\line
+  if (!salt || !currentHash) return false;\line
+\line
+  const candidateHash = scryptSync(password, salt, 64);\line
+  const originalHash = Buffer.from(currentHash, 'hex');\line
+\line
+  if (candidateHash.length !== originalHash.length) return false;\line
+  return timingSafeEqual(candidateHash, originalHash);\line
+\}\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Guardar contrasenas en texto plano es una vulnerabilidad critica.\par
+- El uso de salt evita que dos contrasenas iguales generen el mismo valor.\par
+- timingSafeEqual reduce riesgos de comparaciones inseguras.\par
+- Se eligio crypto nativo para no agregar dependencia externa innecesaria.\par
+\par
+\b 4.5. Fortalecimiento del servicio de usuarios\b0\par
+Se modifico UsersService para registrar usuarios de forma segura.\par
+\par
+Cambios implementados:\par
+- Normalizacion del correo a minusculas.\par
+- Validacion de correo duplicado.\par
+- Cifrado de la contrasena antes de guardar.\par
+- Devolucion de un usuario seguro sin el campo password.\par
+\par
+Codigo principal:\par
+{\f1\fs20
+async create(data: CreateUserDto) \{\line
+  const email = data.email?.trim().toLowerCase();\line
+  const existingUser = await this.findByEmail(email);\line
+\line
+  if (existingUser) \{\line
+    throw new BadRequestException('Ya existe un usuario con este correo');\line
+  \}\line
+\line
+  const newUser = new this.userModel(\{\line
+    ...data,\line
+    email,\line
+    password: this.passwordService.hashPassword(data.password),\line
+  \});\line
+\line
+  const savedUser = await newUser.save();\line
+  return \{\line
+    message: 'Usuario registrado correctamente',\line
+    user: this.toSafeUser(savedUser),\line
+  \};\line
+\}\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Evita usuarios duplicados por diferencias entre mayusculas y minusculas.\par
+- Evita devolver la contrasena al frontend.\par
+- Deja preparado el backend para login seguro.\par
+\par
+\b 4.6. Actualizacion del esquema de usuarios\b0\par
+Se actualizo el esquema de Mongoose para exigir campos sensibles.\par
+\par
+Codigo aplicado:\par
+{\f1\fs20
+export const UserSchema = new Schema(\{\line
+  nombre: String,\line
+  email: \{ type: String, required: true, unique: true \},\line
+  password: \{ type: String, required: true \},\line
+  tipo: String,\line
+\});\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Asegura integridad minima en la coleccion users.\par
+- Refuerza a nivel de modelo la regla de correo unico.\par
+\par
+\b 4.7. Integracion del modulo auth en AppModule\b0\par
+Se registro AuthModule en AppModule y se dejo la URI de MongoDB configurable mediante variable de entorno.\par
+\par
+Codigo principal:\par
+{\f1\fs20
+MongooseModule.forRoot(\line
+  process.env.MONGODB_URI ??\line
+    'mongodb+srv://admin:admin123@cluster0.dkxqee7.mongodb.net/foodsync',\line
+),\line
+UsersModule,\line
+DonationsModule,\line
+AuthModule,\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- Permite conectar el backend a la base de datos foodsync.\par
+- La variable de entorno facilita despliegue y cambios de credenciales sin tocar codigo.\par
+\par
+\b 5. Modificaciones en el frontend\b0\par
+\par
+\b 5.1. Creacion de pantalla de login\b0\par
+Se creo el archivo login.html para que el usuario pueda iniciar sesion desde la interfaz.\par
+\par
+Justificacion:\par
+- El proyecto ya contaba con registro, pero no con acceso autenticado.\par
+- Era necesario completar el flujo funcional del usuario.\par
+\par
+\b 5.2. Actualizacion del index principal\b0\par
+Se agrego un boton de acceso a login desde index.html.\par
+\par
+Justificacion:\par
+- Mejora la navegacion y hace visible la nueva funcionalidad.\par
+\par
+\b 5.3. Adaptacion de la logica JavaScript\b0\par
+El archivo js\app.js fue modificado para integrar registro, login, persistencia de sesion y proteccion de paginas.\par
+\par
+Cambios clave:\par
+- Se cambio la URL del backend a http://localhost:3000.\par
+- Se creo SESSION_KEY para guardar la sesion en localStorage.\par
+- Se implemento guardarSesion y obtenerSesion.\par
+- Se agrego requiereAutenticacion para bloquear panel.html y publicar.html.\par
+- Se conecto el formulario de login con POST /auth/login.\par
+- Se mejoro el manejo de respuestas del backend.\par
+\par
+Fragmentos importantes:\par
+{\f1\fs20
+const API_URL = "http://localhost:3000";\line
+const SESSION_KEY = "foodsync_session";\line
+\line
+function guardarSesion(session) \{\line
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));\line
+\}\line
+\line
+function requiereAutenticacion() \{\line
+  const currentPage = window.location.pathname.split("/").pop();\line
+  const protectedPages = ["publicar.html", "panel.html"];\line
+\line
+  if (protectedPages.includes(currentPage) && !obtenerSesion()) \{\line
+    alert("Debes iniciar sesion para continuar.");\line
+    window.location.href = "login.html";\line
+  \}\line
+\}\line
+}{\f0\fs24\par
+\par
+Logica del login:\par
+{\f1\fs20
+document.getElementById("loginForm")?.addEventListener("submit", async (e) => \{\line
+  e.preventDefault();\line
+\line
+  const data = \{\line
+    email: e.target[0].value,\line
+    password: e.target[1].value,\line
+  \};\line
+\line
+  const res = await fetch(`$\{API_URL\}/auth/login`, \{\line
+    method: "POST",\line
+    headers: \{ "Content-Type": "application/json" \},\line
+    body: JSON.stringify(data),\line
+  \});\line
+\line
+  const session = await manejarRespuesta(res);\line
+  guardarSesion(session);\line
+  window.location.href = "panel.html";\line
+\});\line
+}{\f0\fs24\par
+\par
+Justificacion:\par
+- El frontend debia integrarse con el backend real, no solo con paginas estaticas.\par
+- localStorage permite persistir una sesion simple entre paginas.\par
+- La proteccion de vistas evita acceso directo sin autenticacion.\par
+\par
+\b 6. Correcciones tecnicas realizadas durante la integracion\b0\par
+Durante la implementacion aparecieron varios ajustes adicionales necesarios:\par
+\par
+1. Se corrigieron imports de tipos con import type en controladores NestJS para cumplir con la configuracion de TypeScript.\par
+2. Se detecto que los usuarios antiguos en MongoDB tenian contrasenas en texto plano, por lo que se recomendo volver a registrarlos para que el sistema nuevo los guarde cifrados.\par
+3. Se identifico que npm en PowerShell estaba bloqueado por ExecutionPolicy, por lo que se uso npm.cmd como alternativa operativa.\par
+4. Se verifico que el backend estaba leyendo correctamente la base de datos cuando la ruta http://localhost:3000/users devolvio JSON.\par
+\par
+\b 7. Flujo funcional final del sistema\b0\par
+El flujo final del sistema quedo de la siguiente manera:\par
+1. El usuario entra a registro.html.\par
+2. El formulario envia POST /users.\par
+3. El backend valida duplicados y cifra la contrasena.\par
+4. El usuario queda almacenado en MongoDB.\par
+5. El usuario entra a login.html.\par
+6. El formulario envia POST /auth/login.\par
+7. El backend valida email y contrasena.\par
+8. Si las credenciales son correctas, se guarda la sesion en localStorage.\par
+9. El usuario accede a panel.html.\par
+10. Si intenta entrar a panel.html o publicar.html sin sesion, es redirigido a login.html.\par
+\par
+\b 8. Endpoints disponibles despues de la modificacion\b0\par
+- GET /users : lista usuarios sin exponer contrasena.\par
+- POST /users : registra usuario nuevo con contrasena cifrada.\par
+- POST /auth/login : autentica usuario por email y contrasena.\par
+- GET /donations : lista donaciones.\par
+- POST /donations : crea una donacion.\par
+\par
+\b 9. Justificacion general de la solucion\b0\par
+La solucion implementada responde a criterios de seguridad, organizacion y funcionalidad:\par
+- Seguridad: las contrasenas ya no se almacenan en texto plano para los registros nuevos.\par
+- Escalabilidad: la separacion en modulo auth y servicio de contrasenas facilita futuras mejoras.\par
+- Mantenibilidad: cada capa tiene responsabilidades claras.\par
+- Integracion real: el frontend ya interactua con el backend y con MongoDB.\par
+- Experiencia de usuario: ahora existe flujo completo de registro e inicio de sesion.\par
+\par
+\b 10. Recomendaciones futuras\b0\par
+1. Reemplazar el token aleatorio por JWT con expiracion.\par
+2. Agregar validaciones DTO con class-validator.\par
+3. Mover la cadena de conexion a un archivo .env y usar @nestjs/config.\par
+4. Hash de usuarios antiguos para unificar el estado de la base de datos.\par
+5. Agregar logout visible en la interfaz.\par
+6. Proteger endpoints sensibles del backend, no solo paginas del frontend.\par
+7. Crear pruebas unitarias y de integracion para login y registro.\par
+\par
+\b 11. Conclusion\b0\par
+La modificacion transformo el proyecto de una aplicacion con registro basico a una aplicacion con autenticacion funcional conectada a MongoDB. Se incorporaron buenas practicas de separacion por capas, proteccion de contrasenas, validacion de credenciales y control de acceso basico desde el frontend.\par
+\par
+Fin del documento.\par
+}
