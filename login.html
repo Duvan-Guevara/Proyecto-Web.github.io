@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+<meta charset="UTF-8">
+<title>Iniciar Sesion | FoodSync</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="styles.css">
+
+</head>
+
+<body>
+
+<header class="hero small">
+    <h1>Iniciar Sesion</h1>
+</header>
+
+<div class="container center">
+
+    <div class="card form-card">
+
+        <form id="loginForm" class="form">
+
+            <label>Correo electronico</label>
+            <input id="loginEmail" type="email" placeholder="ejemplo@email.com" required>
+
+            <label>Contrasena</label>
+            <input id="loginPassword" type="password" placeholder="Tu contrasena" required>
+
+            <div id="twoFactorLoginGroup" hidden>
+                <label>Codigo de Google Authenticator</label>
+                <input id="loginTwoFactorCode" type="text" placeholder="123456" maxlength="6">
+                <p class="helper-text">Abre Google Authenticator y escribe el codigo de 6 digitos.</p>
+            </div>
+
+            <button id="loginButton" class="btn btn-primary">Entrar</button>
+
+        </form>
+
+        <a href="registro.html" class="link">Crear una cuenta</a>
+
+    </div>
+
+</div>
+
+<script src="js/app.js"></script>
+
+</body>
+</html>
